@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔮 포춘쿠키 AI 가챠 운세 (B+안 MVP)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #fcf8e3; color: #4b380a; }
+        .header-bg { background-color: #ffc400; padding: 20px 0; }
+        .input-card, .result-card { border-radius: 12px; box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1); }
+        .interest-btn { transition: all 0.2s; border: 2px solid #ffc400; padding: 8px 12px; border-radius: 9999px; font-size: 0.9rem; margin: 4px; }
+        .interest-btn.selected { background-color: #ffc400; color: #4b380a; border-color: #e0a800; font-weight: 700; }
+        .gacha-btn { background-color: #9c27b0; transition: background-color 0.2s; }
+        .gacha-btn:hover { background-color: #7b1fa2; }
+        
+        /* 로딩 오버레이 스타일 */
+        #loadingOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); z-index: 100; display: none; }
+        .loader-content { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+        .loader-gif { width: 150px; height: 150px; background-color: #ffc400; border-radius: 50%; margin: 0 auto 20px; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 196, 0, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(255, 196, 0, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 196, 0, 0); } }
+    </style>
+</head>
+<body>
+
+    <!-- 가챠 로딩 오버레이 -->
+    <div id="loadingOverlay">
+        <div class="loader-content">
+            <div class="loader-gif"></div> 
+            <h2 class="text-white text-3xl font-bold mb-4">🔮 운세 가챠를 뽑는 중...</h2>
+            <p id="loadingMessage" class="text-yellow-300 text-lg"></p>
+        </div>
+    </div>
+    
+    <div class="header-bg shadow-xl">
+        <div class="max-w-3xl mx-auto p-4 text-center">
+            <h1 class="text-3xl font-extrabold text-[#4b380a]">🎰 포춘쿠키 AI 가챠</h1>
+            <p class="text-sm">사주/일정을 바탕으로 오늘의 운세를 바로 확인하세요!</p>
+        </div>
+    </div>
+
+    <div class="max-w-3xl mx-auto p-4">
+        
+        <!-- === HOME 화면 === -->
+        <div id="homeScreen" class="hidden space-y-4">
+            
+            <div class="flex justify-between items-center bg-white p-4 input-card">
+                <p id="homeHeader" class="text-xl font-bold">👋 OOO님, 오늘의 운세입니다.</p>
+                <button onclick="showOnboarding(true)" class="py-2 px-4 bg-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-300 transition text-sm">
+                    📝 정보 수정
+                </button>
+            </div>
+
+            <!-- HOME 화면의 컨트롤 버튼 -->
+            <div class="flex justify-center space-x-4 mb-6">
+                 <button onclick="checkAndDisplayFortune()" class="py-3 px-6 bg-[#ffc400] text-[#4b380a] font-bold rounded-lg hover:bg-yellow-600 transition text-lg shadow-md">
+                    🔄 오늘의 운세 바로 확인
+                </button>
+                <a href="#" onclick="alert('TODO: 마이페이지 - 운세 모음집 (DB 필요)')" class="py-3 px-6 bg-gray-400 text-white font-bold rounded-lg hover:bg-gray-500 transition text-lg shadow-md">
+                    📚 내 운세 저장소
+                </a>
+            </div>
+            
+            <!-- HOME 화면의 운세 표시 영역 -->
+            <div id="homeResult" class="min-h-[300px] flex items-center justify-center bg-white rounded-xl shadow-lg p-6">
+                <p class="text-gray-500">운세 확인 버튼을 눌러 오늘의 포춘쿠키를 뽑아보세요!</p>
+            </div>
+            
+            <!-- 관심사 탭 버튼 영역 -->
+            <div id="tabsContainer" class="mt-6 flex justify-center space-x-2">
+                <!-- 탭 버튼이 동적으로 생성될 영역 -->
+            </div>
+
+            <!-- 상세 풀이 영역 -->
+            <div id="tabContent" class="mt-6 bg-white input-card p-4">
+                <p class="text-gray-500">상세 풀이를 보려면 목표 탭을 눌러주세요.</p>
+            </div>
+            
+        </div>
+        
+        <!-- === 온보딩 화면 (숨겨짐) === -->
+        <div id="onboardingScreen">
+            <h2 class="text-2xl font-bold mb-6 text-gray-800">1. 나의 정보 입력</h2>
+            
+            <div class="bg-white input-card p-6 space-y-4">
+                
+                <!-- 사주 정보 -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="birthDate" class="block text-sm font-medium text-gray-700">생년월일 (양력)</label>
+                        <input type="date" id="birthDate" class="mt-1 block w-full border border-gray-300 rounded-lg p-2">
+                    </div>
+                    <div>
+                        <label for="birthTime" class="block text-sm font-medium text-gray-700">태어난 시각</label>
+                        <input type="time" id="birthTime" class="mt-1 block w-full border border-gray-300 rounded-lg p-2">
+                    </div>
+                    <div>
+                        <label for="genderSelect" class="block text-sm font-medium text-gray-700">성별</label>
+                        <select id="genderSelect" class="mt-1 block w-full border border-gray-300 rounded-lg p-2">
+                            <option value="남성">남성</option>
+                            <option value="여성">여성</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="loveStatus" class="block text-sm font-medium text-gray-700">연애 상태</label>
+                        <select id="loveStatus" class="mt-1 block w-full border border-gray-300 rounded-lg p-2">
+                            <option value="싱글(솔로)">싱글(솔로)</option>
+                            <option value="연애 중">연애 중</option>
+                            <option value="기혼">기혼</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 개인 맥락 -->
+                <h3 class="text-lg font-bold pt-4 border-t text-gray-800">현재 상황 및 말투 선택</h3>
+                <label for="jobInput" class="block text-sm font-medium text-gray-700">직업/상태 (자세히)</label>
+                <input type="text" id="jobInput" placeholder="예: 취준생, 이직 준비 N년차, 프리랜서" class="mt-1 block w-full border border-gray-300 rounded-lg p-2">
+                
+                <label for="toneSelect" class="block text-sm font-medium text-gray-700">선호하는 말투</label>
+                <select id="toneSelect" class="mt-1 block w-full border border-gray-300 rounded-lg p-2">
+                    <option value="다정한 친구의 말투 (반말, 공감)">① 다정한 친구 (반말)</option>
+                    <option value="따뜻한 조언가의 말투 (존댓말, 쿠션어)">② 따뜻한 조언가 (존댓말)</option>
+                    <option value="논리적인 분석가의 말투 (팩트, 냉철함)">③ 논리적인 분석가 (팩트)</option>
+                </select>
+                
+                <!-- 관심사 3개 선택 -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">이번 달의 핵심 목표 (3개 선택)</label>
+                    <div id="interestOptions" class="flex flex-wrap gap-2">
+                        <button type="button" class="interest-btn" data-interest="💼 커리어/공부">💼 커리어/공부</button>
+                        <button type="button" class="interest-btn" data-interest="💰 금전/재정">💰 금전/재정</button>
+                        <button type="button" class="interest-btn" data-interest="❤️ 연애/관계">❤️ 연애/관계</button>
+                        <button type="button" class="interest-btn" data-interest="🧘 건강/에너지">🧘 건강/에너지</button>
+                        <button type="button" class="interest-btn" data-interest="🌱 자기계발">🌱 자기계발</button>
+                    </div>
+                    <p id="interestCount" class="text-xs text-gray-500 mt-1">0/3개 선택됨</p>
+                </div>
+                
+                <button type="button" onclick="saveAndGenerate()" class="w-full py-4 gacha-btn text-white font-bold text-xl rounded-lg shadow-2xl">
+                    💾 정보 저장 후 운세 뽑기!
+                </button>
+
+                <!-- 구글 캘린더 연동 영역 -->
+                <div class="mt-6 text-center">
+                    <p id="calendarStatus" class="text-sm font-bold text-red-600 mb-2">⚠️ 캘린더 미연동</p>
+                    <button type="button" id="connectCalendarBtn" 
+                            onclick="connectGoogleCalendar()" 
+                            class="bg-white hover:bg-gray-100 text-gray-800 font-semibold py-2 px-4 border border-gray-400 rounded shadow inline-flex items-center">
+                        <img src="https://upload.wikimedia.org/wikipedia/commons/a/a5/Google_Calendar_icon_%282020%29.svg" 
+                             alt="Google Calendar" 
+                             class="w-5 h-5 mr-2">
+                        구글 캘린더 연동하기
+                    </button>
+                </div>
+                
+                <!-- 캘린더 연동 후 상태 표시 영역 -->
+                <div id="calendarConnectedStatus" class="mt-4 text-center hidden">
+                    <p class="text-sm font-bold text-green-600">✅ 캘린더 연동됨</p>
+                    <button type="button" 
+                            onclick="disconnectGoogleCalendar()" 
+                            class="text-sm text-gray-600 hover:text-red-600 mt-1">
+                        연동 해제
+                    </button>
+                </div>
+
+            </div>
+        </div>
+        
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
